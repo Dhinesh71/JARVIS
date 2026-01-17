@@ -38,14 +38,19 @@ const ChatInput = ({ onSendMessage, isThinking, editMessage, onEditComplete }) =
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (message.trim() && !isThinking) {
-            onSendMessage(message);
-            setMessage('');
-            if (isListening) {
-                speechRecognizer.stop();
-                setIsListening(false);
-            }
+
+        // Prevent double submission if already thinking or text is empty
+        if (!message.trim() || isThinking) return;
+
+        // Immediate Mic Shutdown to prevent trickling text
+        if (isListening) {
+            speechRecognizer.stop();
+            setIsListening(false);
         }
+
+        const finalMessage = message.trim();
+        setMessage(''); // Clear input immediately
+        onSendMessage(finalMessage);
     };
 
     return (

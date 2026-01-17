@@ -14,11 +14,13 @@ export class SpeechRecognizer {
 
         // Mobile fix: Track active state and restart attempts
         this.isActive = false;
+        this.manualStop = false; // Track if user explicitly clicked stop
         this.restartCount = 0;
         this.maxRestarts = 10;
         this.onResultCallback = null;
         this.onEndCallback = null;
         this.onErrorCallback = null;
+        this.lastTranscript = ""; // Prevent duplicate updates
     }
 
     setLanguage(lang) {
@@ -31,6 +33,7 @@ export class SpeechRecognizer {
         if (!this.recognition) return;
 
         this.isActive = true;
+        this.manualStop = false;
         this.restartCount = 0;
         this.onResultCallback = onResult;
         this.onEndCallback = onEnd;
@@ -45,19 +48,20 @@ export class SpeechRecognizer {
                 .map(result => result.transcript)
                 .join('');
 
-            if (this.onResultCallback) {
+            if (this.onResultCallback && transcript !== this.lastTranscript) {
+                this.lastTranscript = transcript;
                 this.onResultCallback(transcript);
             }
         };
 
         this.recognition.onend = () => {
-            // Auto-restart for mobile if still active
-            if (this.isActive && this.restartCount < this.maxRestarts) {
+            // Auto-restart for mobile if still active and NOT manually stopped
+            if (this.isActive && !this.manualStop && this.restartCount < this.maxRestarts) {
                 console.log('Speech recognition ended, restarting...', this.restartCount);
                 this.restartCount++;
 
                 setTimeout(() => {
-                    if (this.isActive) {
+                    if (this.isActive && !this.manualStop) {
                         try {
                             this.recognition.start();
                         } catch (e) {
@@ -103,7 +107,12 @@ export class SpeechRecognizer {
 
     stop() {
         this.isActive = false;
+        this.manualStop = true;
         this.restartCount = 0;
+        this.lastTranscript = "";
+
+        // Clear callbacks immediately to prevent late-arriving results
+        this.onResultCallback = null;
 
         if (this.recognition) {
             try {
