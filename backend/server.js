@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
+const { searchWeb } = require('./utils/search');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,17 +30,30 @@ app.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message field is required' });
     }
 
+    // 1. Perform Web Search (Free DuckDuckGo scraping)
+    const searchResults = await searchWeb(message);
+
+    // 2. Construct Web Context Block
+    let webContextBlock = `LIVE WEB CONTEXT (FREE SEARCH RESULTS):\n\nSearch Engine: DuckDuckGo (free)\nSearch Query: "${message}"\n\n`;
+
+    if (searchResults.length > 0) {
+      searchResults.forEach((result, index) => {
+        webContextBlock += `Result ${index + 1}:\nTitle: ${result.title}\nSnippet: ${result.snippet}\nSource: ${result.url}\n\n`;
+      });
+    } else {
+      webContextBlock += "Live web data is unavailable or insufficient. I cannot answer this reliably.\n\n";
+    }
+
+    // 3. Construct Final Prompt with User Message
+    const enrichedMessage = `${webContextBlock}Using ONLY the LIVE WEB CONTEXT above, answer the following question accurately:\n\n${message}`;
+
     // Ensure history is an array
     const previousHistory = Array.isArray(history) ? history : [];
 
-    // 1. & 2. Receive message and Append user message
     // Construct the messages array for the API call
-    // The history sent from frontend should already contain the system prompt if strictly following "Send FULL history".
-    // However, we append the *current* new message here as per instructions.
-
     const messagesForAI = [
       ...previousHistory,
-      { role: 'user', content: message }
+      { role: 'user', content: enrichedMessage }
     ];
 
     // 3. Call Groq Chat API
