@@ -1,0 +1,92 @@
+.message-bubble {
+  position: relative;
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  max-width: 80%;
+  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-bubble:hover {
+  transform: translateY(-1px);
+}
+
+/* --- User Bubble (Right) --- */
+.message-bubble.user {
+  margin-left: auto;
+  margin-right: 0;
+  background: linear-gradient(135deg, rgba(0, 243, 255, 0.08) 0%, rgba(0, 102, 255, 0.05) 100%);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.05), inset 0 0 10px rgba(0, 243, 255, 0.02);
+  border-bottom-right-radius: 2px;
+}
+
+/* --- Assistant Bubble (Left) --- */
+.message-bubble.assistant {
+  margin-right: auto;
+  margin-left: 0;
+  background: linear-gradient(135deg, rgba(189, 0, 255, 0.08) 0%, rgba(10, 20, 40, 0.6) 100%);
+  border: 1px solid rgba(189, 0, 255, 0.2);
+  border-left: 3px solid #bd00ff;
+  box-shadow: 0 0 20px rgba(189, 0, 255, 0.05);
+  border-bottom-left-radius: 2px;
+  padding-bottom: 30px;
+  /* Space for the speaker button */
+}
+
+/* --- Headers (YOU / J.A.R.V.I.S) --- */
+.message-header {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.message-bubble.user .message-header {
+  color: #00f3ff;
+  text-align: right;
+  text-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
+}
+
+.message-bubble.assistant .message-header {
+  color: #bd00ff;
+  text-align: left;
+  text-shadow: 0 0 8px rgba(189, 0, 255, 0.4);
+}
+
+/* --- Content Text --- */
+.message-content {
+  color: #e0faff;
+  line-height: 1.5;
+  font-size: 1rem;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 500;
+}
+
+/* --- Speaker Button --- */
+.speak-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  color: #00f3ff;
+}
+
+.speak-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 5px rgba(0, 243, 255, 0.8));
+}

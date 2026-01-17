@@ -14,8 +14,8 @@ const ChatWindow = ({ history, isThinking }) => {
 
     return (
         <div className="chat-window">
-            {history.map((msg, index) => (
-                <MessageBubble key={index} role={msg.role} content={msg.content} />
+            {history.filter(msg => msg.role !== 'system').map((msg, index) => (
+                <MessageBubble key={index} message={msg} />
             ))}
 
             {isThinking && (

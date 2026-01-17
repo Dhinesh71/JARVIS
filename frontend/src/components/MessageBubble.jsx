@@ -1,23 +1,29 @@
-import React from 'react';
+import { speakText } from "../utils/voice";
+import "./MessageBubble.css";
 
-const MessageBubble = ({ role, content }) => {
-    const isUser = role === 'user';
-    const isSystem = role === 'system';
-
-    if (isSystem) return null;
+function MessageBubble({ message }) {
+    const isAI = message.role === "assistant";
 
     return (
-        <div className={`message-container ${isUser ? 'user-container' : 'assistant-container'}`}>
-            <div className={`message-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}`}>
-                <div className="message-role">
-                    {isUser ? 'YOU' : 'J.A.R.V.I.S'}
-                </div>
-                <div className="message-content">
-                    {content}
-                </div>
+        <div className={`message-bubble ${message.role}`}>
+            <div className="message-header">
+                {isAI ? "J.A.R.V.I.S" : "YOU"}
             </div>
+            <div className="message-content">
+                {message.content}
+            </div>
+
+            {isAI && (
+                <button
+                    className="speak-btn"
+                    onClick={() => speakText(message.content)}
+                    title="Speak"
+                >
+                    🔊
+                </button>
+            )}
         </div>
     );
-};
+}
 
 export default MessageBubble;
