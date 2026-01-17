@@ -22,13 +22,14 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: '*', // Allow all for development/alpha; lock down to specific domains in prod if needed
+const corsOptions = {
+  origin: true, 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   credentials: true
-}));
-app.options('*', cors()); // Pre-flight request handling
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Pre-flight request handling
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
