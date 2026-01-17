@@ -39,17 +39,19 @@ function App() {
   const [isThinking, setIsThinking] = useState(false);
 
   const handleSendMessage = async (message) => {
+    // Optimistic Update: Show user message immediately
+    const newUserMsg = { role: 'user', content: message };
+    setHistory((prev) => [...prev, newUserMsg]);
     setIsThinking(true);
 
     try {
-      // Manage Conversation Memory Limit (System + Last 15)
+      // Capture current history for backend context (before the new message is fully committed to backend logic)
+      // We use the 'history' state variable which holds the state at the beginning of this render cycle/function call
       let historyToSend = history;
       if (history.length > 15) {
-        // Keep System (index 0) and the last 14 messages
         historyToSend = [history[0], ...history.slice(history.length - 14)];
       }
 
-      // Backend API URL (Use environment variable or default to local)
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/chat';
 
       const response = await fetch(API_URL, {
@@ -69,31 +71,33 @@ function App() {
 
       const data = await response.json();
 
-      // Update history with the full history returned from backend (which includes the new user msg + assistant reply)
-      // Note: Backend handles appending user msg and assistant msg.
+      // Update history with the full history returned from backend
       setHistory(data.history);
 
     } catch (error) {
       console.error('Error sending message:', error);
-      // Optional: Add a visual error message to chat
       const errorMsg = { role: 'assistant', content: 'I apologize, but I am unable to connect to the server at the moment.' };
-      setHistory(prev => [...prev, { role: 'user', content: message }, errorMsg]);
+      setHistory(prev => [...prev, errorMsg]);
     } finally {
       setIsThinking(false);
     }
   };
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>JARVIS</h1>
-        <div className="status-indicator">Online</div>
-      </header>
-      <main className="chat-interface">
-        <ChatWindow history={history} isThinking={isThinking} />
-        <ChatInput onSendMessage={handleSendMessage} isThinking={isThinking} />
-      </main>
-    </div>
+    <>
+      <div className="scanlines"></div>
+      <div className="grid-background"></div>
+      <div className="app-container">
+        <header className="app-header">
+          <h1>JARVIS</h1>
+          <div className="status-indicator">Online</div>
+        </header>
+        <main className="chat-interface">
+          <ChatWindow history={history} isThinking={isThinking} />
+          <ChatInput onSendMessage={handleSendMessage} isThinking={isThinking} />
+        </main>
+      </div>
+    </>
   );
 }
 
