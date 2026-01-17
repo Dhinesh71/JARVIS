@@ -57,18 +57,19 @@ Built with React (Frontend), Node/Express (Backend), and Groq (AI).
 
 ## Deployment
 
-### Backend (Render)
+### Backend (Vercel)
 1.  Push code to GitHub.
-2.  Create a new Web Service on Render.
-3.  Connect your repository.
+2.  Create a new project in Vercel.
+3.  Import your repository.
 4.  Set **Root Directory** to `backend`.
-5.  Set **Build Command** to `npm install`.
-6.  Set **Start Command** to `node server.js`.
-7.  Add Environment Variable `GROQ_API_KEY`.
+5.  Vercel will detect `vercel.json` or defaults.
+6.  Add Environment Variable `GROQ_API_KEY` in Vercel Project Settings.
+7.  Deploy.
+8.  Copy the provided domain (e.g., `https://jarvis-backend.vercel.app`) to use in the Frontend.
 
 ### Frontend (Vercel)
 1.  Push code to GitHub.
-2.  Import project in Vercel.
+2.  Import project in Vercel (or add a second project from the same repo).
 3.  Set **Root Directory** to `frontend`.
 4.  Vercel automatically detects Vite.
-5.  Add Environment Variable `VITE_API_URL` set to your **Deployed Backend URL** (e.g., `https://your-app.onrender.com/chat`).
+5.  Add Environment Variable `VITE_API_URL` set to your **Deployed Backend URL** (e.g., `https://jarvis-backend.vercel.app/chat`).
