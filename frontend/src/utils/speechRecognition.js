@@ -10,7 +10,13 @@ export class SpeechRecognizer {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = true; // Keep listening until manually stopped
         this.recognition.interimResults = true; // Show results as they are spoken
-        this.recognition.lang = "en-IN"; // Default, but we can make this dynamic if needed
+        this.recognition.lang = "en-IN"; // Default
+    }
+
+    setLanguage(lang) {
+        if (this.recognition) {
+            this.recognition.lang = lang;
+        }
     }
 
     start(onResult, onEnd, onError) {

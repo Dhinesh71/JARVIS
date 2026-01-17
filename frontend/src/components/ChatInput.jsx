@@ -4,6 +4,13 @@ import { speechRecognizer } from '../utils/speechRecognition';
 const ChatInput = ({ onSendMessage, isThinking }) => {
     const [message, setMessage] = useState('');
     const [isListening, setIsListening] = useState(false);
+    const [sttLang, setSttLang] = useState('en-IN'); // Default to English
+
+    const toggleLanguage = () => {
+        const newLang = sttLang === 'en-IN' ? 'ta-IN' : 'en-IN';
+        setSttLang(newLang);
+        speechRecognizer.setLanguage(newLang);
+    };
 
     const toggleListening = () => {
         if (isListening) {
@@ -40,6 +47,15 @@ const ChatInput = ({ onSendMessage, isThinking }) => {
 
     return (
         <form className="chat-input-container" onSubmit={handleSubmit}>
+            <button
+                type="button"
+                className={`lang-toggle ${sttLang === 'ta-IN' ? 'active' : ''}`}
+                onClick={toggleLanguage}
+                disabled={isThinking || isListening}
+                title="Switch Language (EN/TA)"
+            >
+                {sttLang === 'en-IN' ? 'EN' : 'TA'}
+            </button>
             <button
                 type="button"
                 className={`mic-button ${isListening ? 'listening' : ''}`}
