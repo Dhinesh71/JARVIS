@@ -55,12 +55,14 @@ async function analyzeIntent(userMessage, history) {
     2. Determine if the user is asking for information that requires a LIVE WEB SEARCH (e.g., "latest news", "weather", "stock price", "release date", "who is...", "recent events").
     3. General coding questions, greetings, logic puzzles, or creative writing DO NOT require search.
     4. If the user asks to "generate", "create", "draw", "visualize" an IMAGE, set "needsImageGen": true.
-    5. If search is needed, generate an optimized search query.
+    5. If the user asks for a "video", "animation", "motion", or "cinematic", set "needsVideoGen": true.
+    6. If search is needed, generate an optimized search query.
 
     Output a STRICT JSON object only:
     {
       "needsSearch": boolean,
       "needsImageGen": boolean,
+      "needsVideoGen": boolean,
       "query": "the_optimized_search_query_or_image_prompt"
     }
 
@@ -302,7 +304,8 @@ Follow the response strategy and style strictly.`
     res.json({
       response: assistantContent,
       history: updatedHistory,
-      image: imageResult // Send image data to frontend
+      image: imageResult,
+      video: req.videoResult // Send video data if available
     });
 
   } catch (error) {
