@@ -12,7 +12,10 @@ The application follows a standard Client-Server architecture:
 graph LR
     User[User] <--> Client[React Frontend (Vite)]
     Client <--> API[Express Backend API]
-    API <--> AI[Groq Cloud API]
+    API <--> Groq[Groq Cloud API (Text/Reasoning)]
+    API <--> Pollinations[Pollinations.ai (Image Gen)]
+    API <--> HF[Hugging Face API (Video Gen)]
+    API <--> Web[DuckDuckGo (Web Search)]
 ```
 
 - **Frontend**: Built with React and Vite, responsible for the user interface, chat history management, and visual effects.
@@ -29,9 +32,16 @@ graph LR
 - **Axios**: HTTP client for communicating with external AI services.
 - **Cors**: Middleware to enable Cross-Origin Resource Sharing.
 - **Dotenv**: Module for loading environment variables.
+- **Multer**: Middleware for handling `multipart/form-data`, used for file uploads.
 
 ### Key Files
 - `server.js`: The main entry point. Sets up the server, middleware, and API routes.
+
+### Utility Modules
+- `utils/search.js`: Live web search functionality using DuckDuckGo.
+- `utils/imageGenerator.js`: Generates images using Pollinations.ai (free) and enhances prompts via Groq.
+- `utils/videoGenerator.js`: Converts generated images into video using Stable Video Diffusion (Hugging Face).
+- `utils/fileProcessor.js`: Handles analysis and summarization of uploaded files.
 
 ### API Endpoints
 
@@ -46,17 +56,19 @@ graph LR
 - **Method**: `POST`
 - **Description**: Sends the user's message and conversation history to the AI model and returns a generated response.
 - **Request Body**:
-    ```json
-    {
-      "message": "Hello Jarvis",
-      "history": [ ...previous messages... ]
-    }
-    ```
+    - **Content-Type**: `multipart/form-data` (if files attached) or `application/json`
+    - **Fields**:
+        - `message` (String): User's query.
+        - `history` (String/JSON): Previous conversation context.
+        - `files` (Array): Optional file uploads (images/text).
+
 - **Response**:
     ```json
     {
       "response": "Hello, sir. How can I assist you?",
-      "history": [ ...updated messages... ]
+      "history": [ ...updated messages... ],
+      "image": "data:image/jpeg;base64,...",   // Optional: Generated Image
+      "video": "data:video/mp4;base64,..."      // Optional: Generated Video
     }
     ```
 
@@ -64,6 +76,7 @@ graph LR
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `GROQ_API_KEY` | Secret key for authenticating with Groq API. | Yes |
+| `HF_API_TOKEN` | Hugging Face API token for video generation (Stable Video Diffusion). | Yes |
 | `PORT` | Port number for the server (defaults to 5000). | No |
 
 ## 4. Frontend Documentation
@@ -80,7 +93,7 @@ graph LR
 - **AICore.jsx**: Visual representation of the AI's processing state (animations).
 - **ChatWindow.jsx**: Scrollable container displaying the list of messages.
 - **ChatInput.jsx**: Input field for user messages.
-- **MessageBubble.jsx**: Individual chat message component with role-based styling.
+- **MessageBubble.jsx**: Individual chat message component. Handles text, **images**, **videos**, and text-to-speech.
 
 ### State Management
 The application uses local component state (React `useState`) in `App.jsx` to manage:
@@ -98,7 +111,7 @@ The application uses local component state (React `useState`) in `App.jsx` to ma
 #### Backend
 1. Navigate to `backend/`.
 2. Install dependencies: `npm install`.
-3. Create `.env` file with `GROQ_API_KEY=your_key_here`.
+3. Create `.env` file with `GROQ_API_KEY=your_key_here` and `HF_API_TOKEN=your_token_here`.
 4. Start server: `npm start` (Runs on port 5000).
 
 #### Frontend
