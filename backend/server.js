@@ -56,14 +56,17 @@ async function analyzeIntent(userMessage, history) {
     3. General coding questions, greetings, logic puzzles, or creative writing DO NOT require search.
     4. If the user asks to "generate", "create", "draw", "visualize" an IMAGE, set "needsImageGen": true.
     5. If the user asks for a "video", "animation", "motion", or "cinematic", set "needsVideoGen": true.
-    6. If search is needed, generate an optimized search query.
+    6. If the user asks to "attend", "solve", "do", or "take" a QUIZ or fill a form at a URL, set "needsQuizSolve": true.
+    7. If search is needed, generate an optimized search query.
+    8. If it's a quiz, the "query" should be the target URL.
 
     Output a STRICT JSON object only:
     {
       "needsSearch": boolean,
       "needsImageGen": boolean,
       "needsVideoGen": boolean,
-      "query": "the_optimized_search_query_or_image_prompt"
+      "needsQuizSolve": boolean,
+      "query": "the_optimized_search_query_or_url"
     }
 
     Context:
@@ -105,12 +108,12 @@ async function analyzeIntent(userMessage, history) {
       return { needsSearch: false, needsImageGen: false, needsVideoGen: false, query: userMessage };
     }
 
-    console.log(`Intent Analysis: Search? ${result.needsSearch} | Image? ${result.needsImageGen}`);
+    console.log(`Intent Analysis: Search? ${result.needsSearch} | Image? ${result.needsImageGen} | Quiz? ${result.needsQuizSolve}`);
     return result;
 
   } catch (error) {
     console.error('Intent Analysis Failed:', error.message);
-    return { needsSearch: false, needsImageGen: false, needsVideoGen: false, query: userMessage }; // Safe fallback
+    return { needsSearch: false, needsImageGen: false, needsVideoGen: false, needsQuizSolve: false, query: userMessage }; // Safe fallback
   }
 }
 
@@ -162,13 +165,57 @@ Role: Full Stack Developer building JARVIS.`;
       : "No recent history.";
 
     // --- 3. ANALYZE INTENT & SEARCH (Conditional) ---
-    const { needsSearch, needsImageGen, needsVideoGen, query: optimizedQuery } = await analyzeIntent(message, history);
+    const { needsSearch, needsImageGen, needsVideoGen, needsQuizSolve, query: optimizedQuery } = await analyzeIntent(message, history);
 
     let webContext = "Live Web Search was not performed.";
     let imageResult = null;
+    let quizResult = null;
 
-    // --- 4. PARALLEL EXECUTION: IMAGE GEN & WEB SEARCH ---
+    // --- 4. PARALLEL EXECUTION: IMAGE GEN, WEB SEARCH, QUIZ SOLVE ---
     const tasks = [];
+
+    // Task 0: Quiz Solver (New)
+    if (needsQuizSolve) {
+      console.log("Triggering Browser Agent for Quiz...");
+      const { solveQuiz } = require('./utils/browserAgent');
+
+      // Dynamic Extraction of User Details
+      let userDetails = {
+        name: "Dhinesh",
+        email: "dhinesh@user.com",
+        phone: "0000000000",
+        regNo: "N/A"
+      };
+
+      try {
+        const extractionPrompt = `Extract user details from the conversation. 
+        Context: ${recentMessages}
+        Current Message: ${message}
+        
+        Return ONLY a JSON object: {"name": "...", "email": "...", "phone": "...", "regNo": "..."}
+        If a detail is missing, use the default values above.`;
+
+        const extRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: extractionPrompt }],
+          response_format: { type: "json_object" }
+        }, {
+          headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` }
+        });
+
+        const extData = JSON.parse(extRes.data.choices[0].message.content);
+        userDetails = { ...userDetails, ...extData };
+        console.log("Extracted User Details for Quiz:", userDetails);
+      } catch (e) {
+        console.warn("User detail extraction failed, using defaults.");
+      }
+
+      tasks.push(
+        solveQuiz(optimizedQuery || message, userDetails)
+          .then(res => ({ type: 'quiz', data: res }))
+          .catch(err => ({ type: 'quiz', error: err }))
+      );
+    }
 
     // Task 1: Image Generation (& Optional Video)
     if (needsImageGen || needsVideoGen) {
@@ -249,6 +296,14 @@ Role: Full Stack Developer building JARVIS.`;
           } else {
             webContext += "\n\n[System: Search returned no results.]";
           }
+        }
+      }
+
+      if (result.type === 'quiz') {
+        if (result.data && result.data.success) {
+          webContext += `\n\n[SYSTEM: Browser Agent successfully completed the task: ${result.data.message}]`;
+        } else {
+          webContext += `\n\n[SYSTEM: Browser Agent failed: ${result.data.error || "Unknown error"}]`;
         }
       }
     });
