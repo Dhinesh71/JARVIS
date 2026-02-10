@@ -1,9 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 const { searchWeb } = require('./utils/search');
 const { generateImage } = require('./utils/imageGenerator');
+const { playMusicOnYoutube } = require('./utils/mediaAgent');
+const { exec } = require('child_process');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -57,8 +60,10 @@ async function analyzeIntent(userMessage, history) {
     4. If the user asks to "generate", "create", "draw", "visualize" an IMAGE, set "needsImageGen": true.
     5. If the user asks for a "video", "animation", "motion", or "cinematic", set "needsVideoGen": true.
     6. If the user asks to "attend", "solve", "do", or "take" a QUIZ or fill a form at a URL, set "needsQuizSolve": true.
-    7. If search is needed, generate an optimized search query.
-    8. If it's a quiz, the "query" should be the target URL.
+    7. If the user asks to "play a song", "go to brave and play", or similar music requests, set "needsMusicPlay": true.
+    8. If search is needed, generate an optimized search query.
+    9. If it's a quiz, the "query" should be the target URL.
+    10. If it's music, the "query" should be the song name only.
 
     Output a STRICT JSON object only:
     {
@@ -66,7 +71,8 @@ async function analyzeIntent(userMessage, history) {
       "needsImageGen": boolean,
       "needsVideoGen": boolean,
       "needsQuizSolve": boolean,
-      "query": "the_optimized_search_query_or_url"
+      "needsMusicPlay": boolean,
+      "query": "the_optimized_search_query_or_url_or_song"
     }
 
     Context:
@@ -75,39 +81,43 @@ async function analyzeIntent(userMessage, history) {
     User Message: ${userMessage}
     `;
 
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: 'You represent output in JSON format only.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.1,
-        max_tokens: 100,
-        response_format: { type: "json_object" }
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    let resultJson = null;
 
-    let result = response.data.choices[0].message.content;
-
-    // Parse JSON safely
-    try {
-      if (typeof result === 'string') {
-        result = JSON.parse(result);
+    // Try Gemini first
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const res = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        });
+        resultJson = res.response.text();
+      } catch (e) {
+        console.warn("Gemini intent analysis failed, falling back to Groq.");
       }
-    } catch (e) {
-      // Fallback if JSON parsing fails but looks like a string
-      console.warn("JSON Parse failed, attempting fallback logic.");
-      return { needsSearch: false, needsImageGen: false, needsVideoGen: false, query: userMessage };
     }
 
+    // Fallback to Groq
+    if (!resultJson) {
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: 'You represent output in JSON format only.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.1,
+          max_tokens: 100,
+          response_format: { type: "json_object" }
+        },
+        { headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` } }
+      );
+      resultJson = response.data.choices[0].message.content;
+    }
+
+    const result = JSON.parse(resultJson);
     console.log(`Intent Analysis: Search? ${result.needsSearch} | Image? ${result.needsImageGen} | Quiz? ${result.needsQuizSolve}`);
     return result;
 
@@ -165,7 +175,7 @@ Role: Full Stack Developer building JARVIS.`;
       : "No recent history.";
 
     // --- 3. ANALYZE INTENT & SEARCH (Conditional) ---
-    const { needsSearch, needsImageGen, needsVideoGen, needsQuizSolve, query: optimizedQuery } = await analyzeIntent(message, history);
+    const { needsSearch, needsImageGen, needsVideoGen, needsQuizSolve, needsMusicPlay, query: optimizedQuery } = await analyzeIntent(message, history);
 
     let webContext = "Live Web Search was not performed.";
     let imageResult = null;
@@ -214,6 +224,17 @@ Role: Full Stack Developer building JARVIS.`;
         solveQuiz(optimizedQuery || message, userDetails)
           .then(res => ({ type: 'quiz', data: res }))
           .catch(err => ({ type: 'quiz', error: err }))
+      );
+    }
+
+    // Task 0.1: Music Playback (New)
+    if (needsMusicPlay) {
+      console.log("Triggering Brave Music Playback...");
+
+      tasks.push(
+        playMusicOnYoutube(optimizedQuery || message)
+          .then(() => ({ type: 'music', success: true }))
+          .catch(err => ({ type: 'music', error: err }))
       );
     }
 
@@ -306,6 +327,14 @@ Role: Full Stack Developer building JARVIS.`;
           webContext += `\n\n[SYSTEM: Browser Agent failed: ${result.data.error || "Unknown error"}]`;
         }
       }
+
+      if (result.type === 'music') {
+        if (result.success) {
+          webContext += `\n\n[SYSTEM: Music playback started in Brave browser.]`;
+        } else {
+          webContext += `\n\n[SYSTEM: Failed to start music playback: ${result.error || "Unknown error"}]`;
+        }
+      }
     });
 
     // --- 5. STRUCTURED INPUT CONSTRUCTION ---
@@ -350,30 +379,57 @@ Rules:
 Follow the response strategy and style strictly.`
     };
 
-    // --- 7. CALL GROQ (REASONING ENGINE) ---
+    // --- 7. AI REASONING (GEMINI PRIMARY, GROQ FALLBACK) ---
     const messagesForAI = [
       systemPrompt,
       { role: 'user', content: structuredInput }
     ];
 
-    const groqResponse = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.1-8b-instant',
-        messages: messagesForAI,
-        temperature: 0.4, // Controlled and confident
-        max_tokens: 500,
-        top_p: 0.9
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    let assistantContent = null;
 
-    const assistantContent = groqResponse.data.choices[0].message.content;
+    // Try Gemini First
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        console.log("Using Gemini 1.5 Flash for Reasoning...");
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: systemPrompt.content + "\n\n" + structuredInput }] }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 1000,
+          }
+        });
+        const response = await result.response;
+        assistantContent = response.text();
+      } catch (e) {
+        console.warn("Gemini reasoning failed:", e.message);
+      }
+    }
+
+    // Fallback to Groq
+    if (!assistantContent) {
+      console.log("Using Groq (Llama 3.1) for Fallback Reasoning...");
+      const groqResponse = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'llama-3.1-8b-instant',
+          messages: messagesForAI,
+          temperature: 0.4,
+          max_tokens: 500,
+          top_p: 0.9
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      assistantContent = groqResponse.data.choices[0].message.content;
+    }
+
     const assistantMessage = { role: 'assistant', content: assistantContent };
 
 
